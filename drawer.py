@@ -20,7 +20,7 @@ screen_width, screen_height = pyautogui.size()
 #               perhaps the brush has a bigger size when dragging compared to clicking?
 
 
-pyautogui.PAUSE = 0.00000125
+pyautogui.PAUSE = 0.000001
 
 running = True
 
