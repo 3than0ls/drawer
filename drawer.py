@@ -19,26 +19,27 @@ screen_width, screen_height = pyautogui.size()
 #               sometimes a color just completely covers up another color when it is being drawn (it is drawn over the other color, hiding it completely)
 #               perhaps the brush has a bigger size when dragging compared to clicking?
 
+# use asyncio to calculate the direction_map while pyautogui is selecting colors
+# apply newfound knowledge when developing skribbler after asyncio
 
 pyautogui.PAUSE = 0.000001
 
 running = True
 
+
 def stop_running():
     global running
     print('Stopped running')
     running = False
-    subprocess.call(['TASKKILL', '/F', '/IM', 'mspaint.exe'])
+    exit()
+    # subprocess.call(['TASKKILL', '/F', '/IM', 'mspaint.exe'])
 
 
-def failsafe():
-    keyboard.add_hotkey('ctrl+shift+a', stop_running)
+keyboard.add_hotkey('ctrl+shift+a', stop_running)
 
-failsafe()
 
 def open_paint():
     # in case any other existing paint processes exist
-    subprocess.call(['TASKKILL', '/F', '/IM', 'mspaint.exe'])
     subprocess.call(['cmd', '/c', 'start', '/max',
                      'C:\\Windows\System32\mspaint.exe'])
 
@@ -203,19 +204,17 @@ def draw(image_name):
     # pixel_map_draw(image_path)
     combined_map_draw(image_path)
 
-    with Image.open(image_path) as im:
-        save_canvas(image_name, im.size)
+    if running:
+        with Image.open(image_path) as im:
+            save_canvas(image_name, im.size)
 
 
 def save_canvas(name, image_size):
     # we remove some pixels from the box because it is not part of the actual canvas that is drawn on, just additional padding to help pyautogui to locate it
     pyautogui.screenshot('images/output/{}_copy.PNG'.format(name), region=(canvas_box[0]+1, canvas_box[1]+1, image_size[0], image_size[1]))
 
-th = None
 
-
-def main(image_name):
-    global th
+def setup(image_name):
     th = threading.Thread(target=open_paint)
     th.start()
     # wait for paint application window to start
@@ -228,15 +227,16 @@ def main(image_name):
     th.join()
     
 
-
-if __name__ == '__main__':
+def main():
+    keep_open = input('keep open paint tabs after finishing? (y/n): ')
     try:
         test_images = os.listdir('images/input/')
         for test_image in test_images:
             image_name = os.path.splitext(test_image)[0]
             running = True
-            main(image_name)
-        stop_running()
+            setup(image_name)
+        if not keep_open.lower() == 'y':
+            stop_running()
         
     except KeyboardInterrupt:
         print('Exiting on KeyboardInterrupt')
@@ -245,3 +245,7 @@ if __name__ == '__main__':
     except pyautogui.FailSafeException:
         print('Exiting on FailSafeException')
         stop_running()
+
+
+if __name__ == '__main__':
+    main()
