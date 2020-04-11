@@ -74,7 +74,7 @@ def pixel_map(image):
     return pixel_colors
 
 
-def draw_directions(image):
+def draw_directions(image_name):
     """
     A sort of combination of the above two methods to truly get the fastest results. 
     It essentially provides the drawer with instructions on where to start and how far to drag down
@@ -98,7 +98,7 @@ def draw_directions(image):
 
     """
     directions = {}
-    with Image.open(image) as image:
+    with Image.open('images/input/{}.png'.format(image_name)) as image:
         width, height = image.size
         pixel = image.load()
         for x in range(width):
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     # print(timeit.timeit(wrapper(pixel_map, 'images/input/test.png'), number=3)) 
     # print(timeit.timeit(wrapper(draw_directions, 'images/input/test.png'), number=3)) 
 
-    # for whatever reason, this doesn't work with timeit (maybe because a part of classify colors comes from a different module?)
+    # for whatever reason, this doesn't work with timeit (maybe because a part of classify colors comes from a different)
     a = time.time()
     for _ in range(500**2):
         classify_color((random.randint(100, 120), random.randint(100, 120), random.randint(100, 120)))

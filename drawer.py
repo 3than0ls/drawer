@@ -6,21 +6,11 @@ import time
 import pyautogui
 import keyboard
 import timeit
+import multiprocessing
 from PIL import Image
-from color_picker import select_color, COLORS, expand_colors, color_locations
+from color_picker import select_color, COLORS, expand_colors, color_locations, add_colors
 from draw_map import color_map, pixel_map, draw_directions
 screen_width, screen_height = pyautogui.size()
-
-# known errors: sometimes dragTo draws a over-extending vertical line
-#               as shown by results from test 6 and test 9, the likeliness of this happening is significantly reduced because of either
-#               1) less distance between starting points or
-#               2) greater detail, meaning smaller line_height_lengths and more of them
-
-#               sometimes a color just completely covers up another color when it is being drawn (it is drawn over the other color, hiding it completely)
-#               perhaps the brush has a bigger size when dragging compared to clicking?
-
-# use asyncio to calculate the direction_map while pyautogui is selecting colors
-# apply newfound knowledge when developing skribbler after asyncio
 
 pyautogui.PAUSE = 0.000001
 
@@ -29,33 +19,22 @@ running = True
 
 def stop_running():
     global running
-    print('Stopped running')
     running = False
     exit()
-    # subprocess.call(['TASKKILL', '/F', '/IM', 'mspaint.exe'])
-
-
-keyboard.add_hotkey('ctrl+shift+a', stop_running)
 
 
 def open_paint():
-    # in case any other existing paint processes exist
+    # paint must be fullscreened for the program to be correctly calibrated (/max)
     subprocess.call(['cmd', '/c', 'start', '/max',
                      'C:\\Windows\System32\mspaint.exe'])
 
 
-def set_thickness():
-    # something seems to be wrong with the thinnest thickness
-    thickness_button = pyautogui.locateCenterOnScreen('images/thickness.png', region=(0, 0, screen_width, screen_height))
-    pyautogui.click(thickness_button[0], thickness_button[1])
-    time.sleep(0.45)
-    pyautogui.click(thickness_button[0], thickness_button[1]+55)
-    pyautogui.moveTo(screen_width-50, 50)
+canvas_box, canvas_x, canvas_y = [None] * 3
 
-
+# drag_draw evolved into color_map_draw, which evolved into pixel_map_draw, and color_map_draw and pixel_map_draw kinda evolved/fused to make combined_map_draw
+# obsolete
 def drag_draw():
     """precursor to what comes below"""
-    # paint must be fullscreened
     # first, locate the canvas of the paint application window
     canvas_center = pyautogui.locateCenterOnScreen(
         'images/canvas.png', region=(0, 0, screen_width, screen_height))
@@ -77,9 +56,7 @@ def drag_draw():
     else:
         print('mspaint canvas not found')
 
-
-canvas_box, canvas_x, canvas_y = [None] * 3
-
+# obsolete
 def color_map_draw(image):
     global canvas_x, canvas_y
     """
@@ -94,6 +71,7 @@ def color_map_draw(image):
             else:
                 return
 
+# obsolete
 def pixel_map_draw(image):
     global canvas_x, canvas_y
     """
@@ -154,14 +132,15 @@ def pixel_map_draw(image):
                 pyautogui.moveTo(canvas_x + x, canvas_y + total_length)
                 pyautogui.drag(0, color_lengths[current_color])
 
-def combined_map_draw(image):
+
+def combined_map_draw(directions, color_locations):
     """
     Combines the two main advantages of the drawing methods above.
     It gets directions of where and how long to draw-drag a line (or click) rather than receiving a map
     This simplifies the code SO MUCH compared to the complexity of pixel_map_draw but is also much faster than both
     """
     global canvas_x, canvas_y
-    combined_dict = draw_directions(image)
+    # combined_dict = draw_directions(image)
     # sort by frequency of color (how often it appears)
     # draw the most frequent colors first, then add on the lesser ones later
     def count_frequency(color_directions):
@@ -170,17 +149,17 @@ def combined_map_draw(image):
             frequency += direction[2]
         return frequency
 
-    color_frequencies = ((color, count_frequency(directions)) for color, directions in combined_dict.items())
+    color_frequencies = ((color, count_frequency(directions)) for color, directions in directions.items())
     sorted_color_frequencies = sorted(color_frequencies, reverse=True, key=lambda x: x[1])
     # if white is the most common, then since the canvas is default white, we can just remove it entirely from the color direction dictionary
     if sorted_color_frequencies[0][0] == 'white':
         sorted_color_frequencies.pop(0)
-        combined_dict.pop('white')
+        directions.pop('white')
 
     for color, _ in sorted_color_frequencies:
-        directions = combined_dict[color]
-        select_color(color)
-        for direction in directions:
+        color_directions = directions[color]
+        select_color(color, color_locations)
+        for direction in color_directions:
             if running:
                 if direction[2] == 1:
                     pyautogui.click(canvas_x + direction[0], canvas_y + direction[1])
@@ -193,51 +172,66 @@ def combined_map_draw(image):
                 return
 
 
-def draw(image_name):
+def draw(image_name, draw_directions, color_locations):
     global canvas_box, canvas_x, canvas_y
-    image_path = 'images/input/{}.PNG'.format(image_name)
     canvas_box = pyautogui.locateOnScreen(
         'images/canvas.png', region=(0, 0, screen_width, screen_height))
     canvas_x, canvas_y = canvas_box[0], canvas_box[1]
     
-    # color_map_draw(image_path)
-    # pixel_map_draw(image_path)
-    combined_map_draw(image_path)
+    combined_map_draw(draw_directions, color_locations)
 
     if running:
-        with Image.open(image_path) as im:
+        with Image.open('images/input/{}.png'.format(image_name)) as im:
             save_canvas(image_name, im.size)
 
 
 def save_canvas(name, image_size):
     # we remove some pixels from the box because it is not part of the actual canvas that is drawn on, just additional padding to help pyautogui to locate it
-    pyautogui.screenshot('images/output/{}_copy.PNG'.format(name), region=(canvas_box[0]+1, canvas_box[1]+1, image_size[0], image_size[1]))
+    pyautogui.screenshot('images/output/{}_copy.png'.format(name), region=(canvas_box[0]+1, canvas_box[1]+1, image_size[0], image_size[1]))
 
 
-def setup(image_name):
+def setup(image_name, directions):
     th = threading.Thread(target=open_paint)
     th.start()
     # wait for paint application window to start
     time.sleep(1)
-    expand_colors(advanced=True, image=image_name)
-    # set_thickness()
-    time.sleep(1)
-    draw(image_name)
+    new_locations = add_colors(directions["new_colors"])
+    color_locations.update(new_locations)
+    time.sleep(0.25)
+    draw(image_name, directions['draw_directions'], color_locations)
     pyautogui.moveTo(screen_width-50, 50)
     th.join()
     
 
+def full_directions(image_name):
+    new_colors = expand_colors(image_name)
+    COLORS.update(new_colors)
+    
+    return {
+        "image_name": image_name,
+        "new_colors": new_colors,
+        "draw_directions": draw_directions(image_name)
+    }
+
+
 def main():
+    keyboard.add_hotkey('ctrl+shift+a', stop_running)
     keep_open = input('keep open paint tabs after finishing? (y/n): ')
+
+    input_images = os.listdir('images/input/')
+    # images = ['images/input/{}'.format(input_image) for input_image in input_images]
+    image_names = [os.path.splitext(input_image)[0] for input_image in input_images]
+    
+    with multiprocessing.Pool() as pool:
+        all_directions = pool.map(full_directions, image_names)
+
     try:
-        test_images = os.listdir('images/input/')
-        for test_image in test_images:
-            image_name = os.path.splitext(test_image)[0]
+        for directions in all_directions:
             running = True
-            setup(image_name)
-        if not keep_open.lower() == 'y':
-            stop_running()
-        
+            setup(directions['image_name'], directions)
+            if not keep_open.lower() == 'y':
+                stop_running()
+
     except KeyboardInterrupt:
         print('Exiting on KeyboardInterrupt')
         stop_running()

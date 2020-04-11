@@ -42,31 +42,32 @@ CUSTOM_COLORS = {
 }
 
 
-def expand_colors(advanced=False, image=None):
+def expand_colors(image_name):
     global COLORS, CUSTOM_COLORS, color_locations
     # two modes: non-advanced, which just adds more pre-defined colors to the color palette, and advanced, which takes the top 10 dominant colors of the image
-    color_1_button_location = pyautogui.locateCenterOnScreen('images/color_1.png')
-    color_2_button_location = (color_1_button_location[0] + 40, color_1_button_location[1])
+    # new_colors = CUSTOM_COLORS
     new_colors = {}
 
+    with Image.open('images/input/{}.png'.format(image_name)) as im:
+        simplified_image = im.convert('P', palette=Image.ADAPTIVE, colors=10).convert('RGBA')
+        color_list = simplified_image.getcolors()
+
+        current_color = 0
+        for color_data in color_list:
+            new_colors['custom_color_{}'.format(current_color)] = color_data[1]
+            current_color += 1
+
+    return new_colors
+
+
+def add_colors(new_colors):
+    color_1_button_location = pyautogui.locateCenterOnScreen('images/color_1.png')
+    color_2_button_location = (color_1_button_location[0] + 40, color_1_button_location[1])
     edit_colors_button_location = (color_1_button_location[0] + 300, color_1_button_location[1])
-    if not advanced:
-        new_colors = CUSTOM_COLORS
-    else:
-        with Image.open('images/input/{}.PNG'.format(image)) as im:
-            simplified_image = im.convert('P', palette=Image.ADAPTIVE, colors=10).convert('RGBA')
-            color_list = simplified_image.getcolors()
-
-            current_color = 0
-            for color_data in color_list:
-                new_colors['custom_color_{}'.format(current_color)] = color_data[1]
-                current_color += 1
-
-
-    COLORS.update(new_colors)
 
     pyautogui.click(color_2_button_location[0], color_2_button_location[1])
 
+    new_locations = {}
 
     current_box = 0
     for color, rgb in new_colors.items():
@@ -87,7 +88,7 @@ def expand_colors(advanced=False, image=None):
 
         # add locations onto current locations
         # location of first custom color box is (760, 103). From then on, the gap between boxes is 22 pixels, and we only need to go right
-        color_locations[color] = (760 + (current_box * 22), 103)
+        new_locations[color] = (760 + (current_box * 22), 103)
         current_box += 1
 
     # click the color 1 button
@@ -95,6 +96,16 @@ def expand_colors(advanced=False, image=None):
     
     pyautogui.moveTo(screen_width-50, 50)
 
+    return new_locations
+
+
+def set_thickness():
+    # something seems to be wrong with the thinnest thickness
+    thickness_button = pyautogui.locateCenterOnScreen('images/thickness.png', region=(0, 0, screen_width, screen_height))
+    pyautogui.click(thickness_button[0], thickness_button[1])
+    time.sleep(0.45)
+    pyautogui.click(thickness_button[0], thickness_button[1]+55)
+    pyautogui.moveTo(screen_width-50, 50)
 
 
 def locate_color(rgb_value):
@@ -131,16 +142,13 @@ def color_selection_locations(refresh=False, _cache={}):
 color_locations = color_selection_locations()
 
 
-def select_color(color):
-    global COLORS, color_locations
-    if color in COLORS:
+def select_color(color, color_locations):
+    if color in color_locations:
         cache_mouse_x, cache_mouse_y = pyautogui.position()
         color_location = color_locations[color]
         pyautogui.doubleClick(
             color_location[0], color_location[1], interval=0.1)
         pyautogui.moveTo(cache_mouse_x, cache_mouse_y)
-    else:
-        return False
 
 
 
@@ -156,72 +164,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Exiting')
         exit()
-
-
-"""
-A failed attempt to make dynamic colors in which when a new color not found on the default palette was given by the input image, we would create it and use it
-dynamic_colors = {}
-
-def dynamic_update_color_selection_locations():
-    global dynamic_colors, color_locations
-    locations = {}
-
-    for dynamic_color_number, rgb in dynamic_colors.items():
-        current_box = dynamic_color_number[-1]
-        locations[rgb] = (760 + (current_box * 22), 103)
-
-    color_locations.update(locations)
-
-
-def dynamic_select_color(rgba, current_box=0, _location_cache={}):
-    global COLORS, dynamic_colors, color_locations
-    # two modes: non-advanced, which just adds more pre-defined colors to the color palette, and advanced, which takes the top 10 dominant colors of the image
-    if not _location_cache:
-        color_1_button_location = pyautogui.locateCenterOnScreen('images/color_1.png')
-        color_2_button_location = (color_1_button_location[0] + 40, color_1_button_location[1])
-
-        edit_colors_button_location = (color_1_button_location[0] + 300, color_1_button_location[1])
-
-        _location_cache['color_1_button'] = color_1_button_location
-        _location_cache['color_2_button'] = color_2_button_location
-        _location_cache['edit_colors_button'] = edit_colors_button_location
-    else:
-        color_1_button_location = _location_cache['color_1_button']
-        color_2_button_location =  _location_cache['color_2_button']
-        edit_colors_button_location = _location_cache['edit_colors_button']
-
-
-    pyautogui.moveTo(color_2_button_location[0], color_2_button_location[1])
-    pyautogui.click()
-
-    # click edit colors button
-    pyautogui.click(edit_colors_button_location[0], edit_colors_button_location[1])
-    time.sleep(0.1)
-    pyautogui.doubleClick(1475, 770)
-    pyautogui.write(str(rgba[0]))
-    pyautogui.doubleClick(1475, 795)
-    pyautogui.write(str(rgba[1]))
-    pyautogui.doubleClick(1475, 820)
-    pyautogui.write(str(rgba[2]))
-    pyautogui.click(1100, 845)
-
-    # the way ms-paint deals with an overflow of new edited colors is that it shifts all colors one to the left
-    # once you've created more than ten colors (your eleventh color), your first color is removed and all the other ones shift left (10 becomes 9, 9 becomes 8, etc.)
-    if current_box > 10:
-        del dynamic_colors['dynamic_color_0']
-        for i in range(1, 10): # update the 9 old colors
-            old_rgba = dynamic_colors['dynamic_color_{}'.format(i)]
-            dynamic_colors['dynamic_color_{}'.format(i-1)] = old_rgba
-            new_rgba = dynamic_colors['dynamic_color_{}'.format(i+1)]
-            dynamic_colors['dynamic_color_{}'.format(i)] = new_rgba
-        dynamic_update_color_selection_locations()
-    else:
-        current_box += 1
-        color_locations[rgba] = (760 + (current_box * 22), 103)
-    dynamic_colors['dynamic_color_{}'.format(current_box)] = rgba
-
-    # click the color 1 button
-    #pyautogui.moveTo(color_1_button_location[0], color_1_button_location[1])
-    #pyautogui.click()
-    
-    #pyautogui.moveTo(screen_width-50, 50)"""
