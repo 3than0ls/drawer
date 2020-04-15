@@ -249,7 +249,7 @@ def main():
         with multiprocessing.Pool() as pool:
             print('resizing images...')
             pool.map(resize, image_names)
-            print('calculating drawing directions... for {}')
+            print('calculating drawing directions...')
             all_directions = pool.map(full_directions, image_names)
 
         for directions in all_directions:
