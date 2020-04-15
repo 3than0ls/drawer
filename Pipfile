@@ -10,6 +10,8 @@ autopep8 = "*"
 pyautogui = "*"
 pillow = "*"
 keyboard = "*"
+google-api-python-client = "*"
+praw = "*"
 
 [requires]
 python_version = "3.8"

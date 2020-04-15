@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 import threading
 import time
@@ -8,12 +7,12 @@ import keyboard
 import timeit
 import multiprocessing
 from PIL import Image
-from color_picker import select_color, COLORS, expand_colors, color_locations, add_colors
-from draw_map import color_map, pixel_map, draw_directions
+from interactions import select_color, COLORS, expand_colors, color_locations, add_colors, set_size, set_thickness
+from directions import color_map, pixel_map, draw_directions
+
 screen_width, screen_height = pyautogui.size()
-
-pyautogui.PAUSE = 0.000001
-
+canvas_box, canvas_x, canvas_y = [None] * 3
+thin_mode = True # thin mode can produce higher quality replicas, especially when replicating small text in images, but will likely have side effects
 running = True
 
 
@@ -28,8 +27,6 @@ def open_paint():
     subprocess.call(['cmd', '/c', 'start', '/max',
                      'C:\\Windows\System32\mspaint.exe'])
 
-
-canvas_box, canvas_x, canvas_y = [None] * 3
 
 # drag_draw evolved into color_map_draw, which evolved into pixel_map_draw, and color_map_draw and pixel_map_draw kinda evolved/fused to make combined_map_draw
 # obsolete
@@ -162,11 +159,19 @@ def combined_map_draw(directions, color_locations):
         for direction in color_directions:
             if running:
                 if direction[2] == 1:
-                    pyautogui.click(canvas_x + direction[0], canvas_y + direction[1])
+                    if not thin_mode:
+                        pyautogui.click(canvas_x + direction[0], canvas_y + direction[1])
+                    else:
+                        # if thinnest thickness is used, perhaps use this?
+                        pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
+                        pyautogui.drag(0, 2)
                 else:
                     pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
-                    # pyautogui.dragTo(canvas_x + direction[0], canvas_y + direction[1] + direction[2]) causes mistakes and lines through the output
-                    pyautogui.drag(0, direction[2])
+                    if not thin_mode:
+                        pyautogui.drag(0, direction[2])
+                    else:
+                        # if thinnest thickness is used, extended the line_length because line lengths are one pixel too short
+                        pyautogui.drag(0, direction[2]+1)
 
             else:
                 return
@@ -174,20 +179,26 @@ def combined_map_draw(directions, color_locations):
 
 def draw(image_name, draw_directions, color_locations):
     global canvas_box, canvas_x, canvas_y
-    canvas_box = pyautogui.locateOnScreen(
-        'images/canvas.png', region=(0, 0, screen_width, screen_height))
+    with Image.open('input/{}.png'.format(image_name)) as im:
+        # 7, 145 is the default x, y location for the canvas
+        canvas_box = (6, 145, im.size[0], im.size[1])
+    # canvas_box = pyautogui.locateOnScreen('images/canvas.png', region=(0, 0, screen_width, screen_height))
     canvas_x, canvas_y = canvas_box[0], canvas_box[1]
+
+    set_size(canvas_box[2:4])
+    time.sleep(0.1)
+    set_thickness()
+    time.sleep(0.1)
     
     combined_map_draw(draw_directions, color_locations)
 
     if running:
-        with Image.open('images/input/{}.png'.format(image_name)) as im:
-            save_canvas(image_name, im.size)
+        save_canvas(image_name, im.size)
 
 
 def save_canvas(name, image_size):
     # we remove some pixels from the box because it is not part of the actual canvas that is drawn on, just additional padding to help pyautogui to locate it
-    pyautogui.screenshot('images/output/{}_copy.png'.format(name), region=(canvas_box[0]+1, canvas_box[1]+1, image_size[0], image_size[1]))
+    pyautogui.screenshot('output/{}_copy.png'.format(name), region=(canvas_box[0], canvas_box[1], image_size[0]-1, image_size[1]-1))
 
 
 def setup(image_name, directions):
@@ -214,28 +225,42 @@ def full_directions(image_name):
     }
 
 
+def resize(image_name):
+    # print('started resizing {}'.format(image_name))
+    new_size = 1000, 1000
+    with Image.open('input/{}.png'.format(image_name)) as im:
+        # limit the size of these images so they don't take too long to complete
+        if im.size[0] > 1800 or im.size[1] > 1000: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
+            im.thumbnail(new_size, Image.ANTIALIAS)
+            im.save('input/{}.png'.format(image_name))
+    # print('finished resizing {}'.format(image_name))
+
+
 def main():
-    keyboard.add_hotkey('ctrl+shift+a', stop_running)
-    keep_open = input('keep open paint tabs after finishing? (y/n): ')
-
-    input_images = os.listdir('images/input/')
-    # images = ['images/input/{}'.format(input_image) for input_image in input_images]
-    image_names = [os.path.splitext(input_image)[0] for input_image in input_images]
-    
-    with multiprocessing.Pool() as pool:
-        all_directions = pool.map(full_directions, image_names)
-
     try:
+        pyautogui.PAUSE = 0.000001
+
+        keyboard.add_hotkey('ctrl+shift+a', stop_running)
+
+        keep_open = input('keep open paint tabs after finishing? (y/n): ')
+
+        image_names = [os.path.splitext(input_image)[0] for input_image in os.listdir('input/')]
+        
+        with multiprocessing.Pool() as pool:
+            print('resizing images...')
+            pool.map(resize, image_names)
+            print('calculating drawing directions... for {}')
+            all_directions = pool.map(full_directions, image_names)
+
         for directions in all_directions:
-            running = True
+            # running = True
             setup(directions['image_name'], directions)
             if not keep_open.lower() == 'y':
-                stop_running()
+                subprocess.call(['taskkill', '/f', '/im', 'mspaint.exe'])
 
     except KeyboardInterrupt:
         print('Exiting on KeyboardInterrupt')
         stop_running()
-        exit()
     except pyautogui.FailSafeException:
         print('Exiting on FailSafeException')
         stop_running()

@@ -1,11 +1,11 @@
-from color_picker import COLORS
+from interactions import COLORS
 from math import sqrt
 from PIL import Image
 import timeit
 import time
 import random
 
-# this function here is the reason why everything is taking so long, so we need to optimize it
+
 def classify_color(rgb, _cache={}, opt_n=0):
     global COLORS
     # colors likely contain an alpha value we do not care about
@@ -24,7 +24,6 @@ def classify_color(rgb, _cache={}, opt_n=0):
         closest_color = min(color_diffs)
         _cache[rgb] = closest_color[1]
         return closest_color[1]
-
 
 
 def color_map(image):
@@ -97,8 +96,9 @@ def draw_directions(image_name):
     Then move onto blue. Start at (1, 2), move down 1px, next row, start at (2, 0) (the next given row/column), and drag down 3px
 
     """
+    # print('calculating drawing directions of {}.png'.format(image_name))
     directions = {}
-    with Image.open('images/input/{}.png'.format(image_name)) as image:
+    with Image.open('input/{}.png'.format(image_name)) as image:
         width, height = image.size
         pixel = image.load()
         for x in range(width):
@@ -121,6 +121,7 @@ def draw_directions(image_name):
                 else:
                     current_line_height += 1
             directions[current_color].append((origin[0], origin[1], current_line_height))
+        # print('finished calculating drawing directions of {}.png'.format(image_name))
         return directions
 
                     
@@ -145,10 +146,10 @@ if __name__ == '__main__':
             return func(*args, **kwargs)
         return wrapped
 
-    # print(timeit.timeit(wrapper(test, 'images/input/test.png'), number=3))
-    # print(timeit.timeit(wrapper(color_map, 'images/input/test.png'), number=3))
-    # print(timeit.timeit(wrapper(pixel_map, 'images/input/test.png'), number=3)) 
-    # print(timeit.timeit(wrapper(draw_directions, 'images/input/test.png'), number=3)) 
+    # print(timeit.timeit(wrapper(test, 'input/test.png'), number=3))
+    # print(timeit.timeit(wrapper(color_map, 'input/test.png'), number=3))
+    # print(timeit.timeit(wrapper(pixel_map, 'input/test.png'), number=3)) 
+    # print(timeit.timeit(wrapper(draw_directions, 'input/test.png'), number=3)) 
 
     # for whatever reason, this doesn't work with timeit (maybe because a part of classify colors comes from a different)
     a = time.time()

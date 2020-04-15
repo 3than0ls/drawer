@@ -1,6 +1,7 @@
 from PIL import Image
 import pyautogui
 import time
+from math import sqrt
 screen_width, screen_height = pyautogui.size()
 
 # ms paint default colors that are given
@@ -48,16 +49,34 @@ def expand_colors(image_name):
     # new_colors = CUSTOM_COLORS
     new_colors = {}
 
-    with Image.open('images/input/{}.png'.format(image_name)) as im:
-        simplified_image = im.convert('P', palette=Image.ADAPTIVE, colors=10).convert('RGBA')
+    with Image.open('input/{}.png'.format(image_name)) as im:
+        simplified_image = im.convert('P', palette=Image.ADAPTIVE, colors=20).convert('RGBA')
         color_list = simplified_image.getcolors()
+
+        # sort the color list by the count of pixels that have that color
+        color_list.sort(reverse=True, key = lambda x : x[0])
+
+        # filter out the alpha value to COLORS to use below
+        rgb_only_list = list(map(lambda rgba : rgba[:3], COLORS.values()))
 
         current_color = 0
         for color_data in color_list:
-            new_colors['custom_color_{}'.format(current_color)] = color_data[1]
-            current_color += 1
+            for rgb in rgb_only_list:
+                color_diff = sqrt(
+                    abs(color_data[1][0] - rgb[0])**2 + 
+                    abs(color_data[1][1] - rgb[1])**2 + 
+                    abs(color_data[1][2] - rgb[2])**2
+                )
+                if color_diff <= 12:
+                    # print('{} already exists as {}, with a color difference of {}'.format(color_data[1], rgb, color_diff))
+                    break
+            else:
+                new_colors['custom_color_{}'.format(current_color)] = color_data[1]
+                current_color += 1
+                if current_color > 9:
+                    break
+        return new_colors
 
-    return new_colors
 
 
 def add_colors(new_colors):
@@ -107,6 +126,22 @@ def set_thickness():
     pyautogui.click(thickness_button[0], thickness_button[1]+55)
     pyautogui.moveTo(screen_width-50, 50)
 
+import subprocess
+def set_size(size):
+    resize_button_location = pyautogui.locateCenterOnScreen('images/resize.png')
+    pyautogui.click(resize_button_location)
+    # location of pixel resize button
+    pyautogui.click(215, 155)
+    # location of disable maintain ratio button
+    pyautogui.click(75, 265)
+    
+    pyautogui.doubleClick(230, 185)
+    pyautogui.write(str(size[0]))
+    pyautogui.doubleClick(230, 227)
+    pyautogui.write(str(size[1]))
+
+    # location of OK button
+    pyautogui.click(140, 450)
 
 def locate_color(rgb_value):
     with Image.open('images/toolbar.png') as toolbar:
@@ -150,17 +185,3 @@ def select_color(color, color_locations):
             color_location[0], color_location[1], interval=0.1)
         pyautogui.moveTo(cache_mouse_x, cache_mouse_y)
 
-
-
-def _test():
-    global color_locations
-    locations = color_selection_locations()
-    print(locations)
-
-
-if __name__ == '__main__':
-    try:
-        _test()
-    except KeyboardInterrupt:
-        print('Exiting')
-        exit()
