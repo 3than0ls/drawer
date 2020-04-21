@@ -4,6 +4,7 @@ import json
 import requests
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
+import os
 
 
 def save_images(image_urls):
@@ -16,7 +17,7 @@ def save_images(image_urls):
 
         try:
             with Image.open(BytesIO(img_data)) as im:
-                im.save('input/test{}.png'.format(i + 1))
+                im.save(os.path.join('input', 'image_{}.png'.format(i + 1)))
         except UnidentifiedImageError:
             print('It appears that {} is not an image file type, so we were unable to save it.'.format(image_url))
 
@@ -25,9 +26,14 @@ def cse_download(query_word, limit=5):
     """offers guaranteed usually high quality images"""
     cse = build('customsearch', 'v1').cse()
 
-    API_KEY = "AIzaSyCnEGK5qSgPRavJrfXbo1ggR88qQfWu0ds" # Custom Search API Key
+    # i'm not exactly a security expert, thank you. It's better than writing my info straight into the code and posting it for github to revel at :)
+    with open("settings.json", "r") as settings_file:
+        cse_auth_settings = json.load(settings_file)["cse_auth"]
+
+    # don't have an api key and search engine ID? register/create one for Custom Search Engine for free! (not an ad)
+    API_KEY = cse_auth_settings['api_key'] # "AIzaSyCnEGK5qSgPRavJrfXbo1ggR88qQfWu0ds" # Custom Search API Key
     # customsearch engine dashboard: https://cse.google.com/cse/setup/basic?cx=005540582309688715671:vhsyr31pydb
-    CX = "005540582309688715671:vhsyr31pydb" # Custom Search Engine ID
+    CX = cse_auth_settings['search_engine_id'] #"005540582309688715671:vhsyr31pydb" # Custom Search Engine ID
 
     # link for cse.list query parameters: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list#request
     request = cse.list(
@@ -45,21 +51,25 @@ def cse_download(query_word, limit=5):
 
 
 def reddit_download(subreddit, popularity="hot", limit=5, random=False):
-    """usually requires specification to correct subreddits that are image-only. Non-image posts aren't saved. However, reddit offers a wider variety and frequently changing content"""
-    # look into https://praw.readthedocs.io/en/latest/code_overview/models/subreddit.html#praw.models.Subreddit.search
+    """requires specification to correct subreddits that are image-only. Non-image posts aren't saved. However, reddit offers a wider variety and frequently changing content"""
 
     # App dashboard: https://www.reddit.com/prefs/apps
-    USERNAME = "3th4n01s"
-    PASSWORD = "edc08102005"
-    SECRET = "aW8rqXQ_nZBAtxucX9kW0gWqeyY"
-    CLIENT_ID = "e7Eo9j4KojcrGA"
+    with open("settings.json", "r") as settings_file:
+        reddit_auth_settings = json.load(settings_file)["reddit_auth"]
+
+    # don't have a reddit account? Get one... at reddit...
+    # don't have a reddit application with a secret and client id? register/create one of those as well, for free (ty for inspiring me reddit)!
+    USERNAME = reddit_auth_settings['username']
+    PASSWORD = reddit_auth_settings['password']
+    SECRET = reddit_auth_settings['secret']
+    CLIENT_ID = reddit_auth_settings['client_id']
 
     reddit = praw.Reddit(
         client_id=CLIENT_ID,
         client_secret=SECRET,
         password=PASSWORD,
         username=USERNAME,
-        user_agent='drawer by /u/3th4n01s'
+        user_agent='drawer from /u/{}'.format(USERNAME)
     )
     reddit.read_only = True
 
@@ -89,12 +99,12 @@ def reddit_download(subreddit, popularity="hot", limit=5, random=False):
     
 
 def download_from_cse(limit=5):
-    query_word = input('What\'s on your mind today, Ethan? \n')
+    query_word = input('What\'s on your mind today? \n')
     cse_download(query_word, limit=limit)
 
 
 def download_from_reddit(limit=5, random=False):
-    subreddit = input('What subreddit, Ethan? \n')
+    subreddit = input('What subreddit would you like to go to? \n')
     if not random:
         search_options = ['hot', 'new', 'rising', 'top', 'controversial']
         popularity = input('Do you want {}, {}, {}, {}, or {}? \n'.format(*search_options))

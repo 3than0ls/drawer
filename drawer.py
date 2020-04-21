@@ -7,16 +7,26 @@ import keyboard
 import timeit
 import multiprocessing
 from PIL import Image
-from interactions import select_color, COLORS, expand_colors, color_locations, add_colors, set_size, set_thickness
+from interactions import select_color, COLORS, expand_colors, color_locations, add_colors, set_size, set_thickness, bucket_color
 from directions import color_map, pixel_map, draw_directions
+from downloader import download_from_cse, download_from_reddit
+import json
 
 screen_width, screen_height = pyautogui.size()
 canvas_box, canvas_x, canvas_y = [None] * 3
-thin_mode = True # thin mode can produce higher quality replicas, especially when replicating small text in images, but will likely have side effects
 running = True
+
+# assign settings
+with open("settings.json", "r") as settings_file:
+    settings = json.load(settings_file)
+    thin_mode = settings["thin_mode"]
+    max_size = settings["max_size"]
+    color_quality = settings["color_quality"]
+    keep_open = settings["keep_open"]
 
 
 def stop_running():
+    """doesnt work as intended half the time"""
     global running
     running = False
     exit()
@@ -29,6 +39,7 @@ def open_paint():
 
 
 # drag_draw evolved into color_map_draw, which evolved into pixel_map_draw, and color_map_draw and pixel_map_draw kinda evolved/fused to make combined_map_draw
+# the below are just there for "historical" purposes
 # obsolete
 def drag_draw():
     """precursor to what comes below"""
@@ -130,110 +141,112 @@ def pixel_map_draw(image):
                 pyautogui.drag(0, color_lengths[current_color])
 
 
+
+def save_canvas(name, image_size):
+    # we remove some pixels from the box because it is not part of the actual canvas that is drawn on, just additional padding to help pyautogui to locate it
+    pyautogui.screenshot(os.path.join('output/', '{}_copy.png'.format(name)), region=(canvas_box[0], canvas_box[1], image_size[0]-1, image_size[1]-1))
+
+
+def full_directions(image_basename):
+    global color_quality
+    new_colors = expand_colors(image_basename, num=color_quality)
+    
+    return {
+        "image_basename": image_basename,
+        "new_colors": new_colors,
+        "draw_directions": draw_directions(image_basename, new_colors)
+    }
+
+
+def resize_image(image_basename):
+    global max_size
+    with Image.open(os.path.join('input', image_basename)) as im:
+        # limit the size of these images so they don't take too long to complete
+        if im.size[0] > max_size[0] or im.size[1] > max_size[0]: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
+            im.thumbnail(max_size, Image.ANTIALIAS)
+        image_name = os.path.splitext(image_basename)[0]
+        im.save(os.path.join('temp', '{}.png'.format(image_name)))
+
 def combined_map_draw(directions, color_locations):
-    """
-    Combines the two main advantages of the drawing methods above.
-    It gets directions of where and how long to draw-drag a line (or click) rather than receiving a map
-    This simplifies the code SO MUCH compared to the complexity of pixel_map_draw but is also much faster than both
-    """
     global canvas_x, canvas_y
     # combined_dict = draw_directions(image)
     # sort by frequency of color (how often it appears)
     # draw the most frequent colors first, then add on the lesser ones later
-    def count_frequency(color_directions):
+    def count_frequency(color_pallete):
         frequency = 0
-        for direction in color_directions:
+        for direction in color_pallete:
             frequency += direction[2]
         return frequency
 
-    color_frequencies = ((color, count_frequency(directions)) for color, directions in directions.items())
-    sorted_color_frequencies = sorted(color_frequencies, reverse=True, key=lambda x: x[1])
-    # if white is the most common, then since the canvas is default white, we can just remove it entirely from the color direction dictionary
-    if sorted_color_frequencies[0][0] == 'white':
-        sorted_color_frequencies.pop(0)
-        directions.pop('white')
+    for color_pallete_number, color_pallete_directions in enumerate(directions['draw_directions']):
+        new_locations = add_colors(directions["new_colors"][color_pallete_number])
+        color_locations.update(new_locations)
 
-    for color, _ in sorted_color_frequencies:
-        color_directions = directions[color]
-        select_color(color, color_locations)
-        for direction in color_directions:
-            if running:
-                if direction[2] == 1:
-                    if not thin_mode:
-                        pyautogui.click(canvas_x + direction[0], canvas_y + direction[1])
-                    else:
-                        # if thinnest thickness is used, perhaps use this?
-                        pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
-                        pyautogui.drag(0, 2)
-                else:
-                    pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
-                    if not thin_mode:
-                        pyautogui.drag(0, direction[2])
-                    else:
-                        # if thinnest thickness is used, extended the line_length because line lengths are one pixel too short
-                        pyautogui.drag(0, direction[2]+1)
+        color_frequencies = ((color, count_frequency(directions)) for color, directions in color_pallete_directions.items())
+        sorted_color_frequencies = sorted(color_frequencies, reverse=True, key=lambda x: x[1])
+        
 
+
+        for i, sorted_color_frequency in enumerate(sorted_color_frequencies):
+            color = sorted_color_frequency[0]
+            color_directions = color_pallete_directions[color]
+            select_color(color, color_locations)
+            if i == 0 and color_pallete_number == 0:
+                # the first index of sorted_color_frequency of the first color_pallete_number is the most common/frequent color, so bucket it
+                bucket_color(canvas_x, canvas_y)
             else:
-                return
+                for direction in color_directions:
+                    if running:
+                        if direction[2] == 1:
+                            if not thin_mode:
+                                pyautogui.click(canvas_x + direction[0], canvas_y + direction[1])
+                            else:
+                                # if thinnest thickness is used, perhaps use this?
+                                pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
+                                pyautogui.drag(0, 2)
+                        else:
+                            pyautogui.moveTo(canvas_x + direction[0], canvas_y + direction[1])
+                            if not thin_mode:
+                                pyautogui.drag(0, direction[2])
+                            else:
+                                # if thinnest thickness is used, extended the line_length because line lengths are one pixel too short
+                                pyautogui.drag(0, direction[2]+1)
+                    else:
+                        return
 
 
-def draw(image_name, draw_directions, color_locations):
+
+def draw(draw_directions, color_locations):
     global canvas_box, canvas_x, canvas_y
-    with Image.open('input/{}.png'.format(image_name)) as im:
-        # 7, 145 is the default x, y location for the canvas
-        canvas_box = (6, 145, im.size[0], im.size[1])
+    with Image.open(os.path.join('temp', draw_directions['image_basename'])) as im:
+        # 6, 144 is about the default x, y location for my canvas
+        canvas_box = (6, 144, im.size[0], im.size[1])
     # canvas_box = pyautogui.locateOnScreen('images/canvas.png', region=(0, 0, screen_width, screen_height))
     canvas_x, canvas_y = canvas_box[0], canvas_box[1]
 
     set_size(canvas_box[2:4])
     time.sleep(0.1)
     set_thickness()
-    time.sleep(0.1)
+    time.sleep(0.8)
     
     combined_map_draw(draw_directions, color_locations)
 
     if running:
+        image_name = os.path.splitext(draw_directions['image_basename'])[0]
         save_canvas(image_name, im.size)
 
 
-def save_canvas(name, image_size):
-    # we remove some pixels from the box because it is not part of the actual canvas that is drawn on, just additional padding to help pyautogui to locate it
-    pyautogui.screenshot('output/{}_copy.png'.format(name), region=(canvas_box[0], canvas_box[1], image_size[0]-1, image_size[1]-1))
 
-
-def setup(image_name, directions):
+def setup(directions):
     th = threading.Thread(target=open_paint)
+    th.setDaemon(True) # hopefully this works properly, haven't actually tested it
     th.start()
-    # wait for paint application window to start
-    time.sleep(1)
-    new_locations = add_colors(directions["new_colors"])
-    color_locations.update(new_locations)
-    time.sleep(0.25)
-    draw(image_name, directions['draw_directions'], color_locations)
+    # wait for paint application to start
+    time.sleep(0.5)
+    draw(directions, color_locations)
     pyautogui.moveTo(screen_width-50, 50)
     th.join()
-    
 
-def full_directions(image_name):
-    new_colors = expand_colors(image_name)
-    COLORS.update(new_colors)
-    
-    return {
-        "image_name": image_name,
-        "new_colors": new_colors,
-        "draw_directions": draw_directions(image_name)
-    }
-
-
-def resize(image_name):
-    # print('started resizing {}'.format(image_name))
-    new_size = 1000, 1000
-    with Image.open('input/{}.png'.format(image_name)) as im:
-        # limit the size of these images so they don't take too long to complete
-        if im.size[0] > 1800 or im.size[1] > 1000: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
-            im.thumbnail(new_size, Image.ANTIALIAS)
-            im.save('input/{}.png'.format(image_name))
-    # print('finished resizing {}'.format(image_name))
 
 
 def main():
@@ -242,21 +255,20 @@ def main():
 
         keyboard.add_hotkey('ctrl+shift+a', stop_running)
 
-        keep_open = input('keep open paint tabs after finishing? (y/n): ')
-
-        image_names = [os.path.splitext(input_image)[0] for input_image in os.listdir('input/')]
+        image_basenames = [os.path.basename(input_image) for input_image in os.listdir('input')]
         
         with multiprocessing.Pool() as pool:
             print('resizing images...')
-            pool.map(resize, image_names)
+            pool.map(resize_image, image_basenames)
             print('calculating drawing directions...')
-            all_directions = pool.map(full_directions, image_names)
+            all_directions = pool.map(full_directions, image_basenames)
 
         for directions in all_directions:
-            # running = True
-            setup(directions['image_name'], directions)
-            if not keep_open.lower() == 'y':
+            # print_results(directions)
+            setup(directions)
+            if not keep_open:
                 subprocess.call(['taskkill', '/f', '/im', 'mspaint.exe'])
+
 
     except KeyboardInterrupt:
         print('Exiting on KeyboardInterrupt')
@@ -264,6 +276,12 @@ def main():
     except pyautogui.FailSafeException:
         print('Exiting on FailSafeException')
         stop_running()
+    finally:
+        # clear everything in temp
+        basenames = [os.path.basename(input_image) for input_image in os.listdir('temp/')]
+        for basename in basenames:
+            os.remove(os.path.join('temp', basename))
+
 
 
 if __name__ == '__main__':
