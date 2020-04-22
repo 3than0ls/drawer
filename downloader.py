@@ -31,9 +31,9 @@ def cse_download(query_word, limit=5):
         cse_auth_settings = json.load(settings_file)["cse_auth"]
 
     # don't have an api key and search engine ID? register/create one for Custom Search Engine for free! (not an ad)
-    API_KEY = cse_auth_settings['api_key'] # "AIzaSyCnEGK5qSgPRavJrfXbo1ggR88qQfWu0ds" # Custom Search API Key
+    API_KEY = cse_auth_settings['api_key'] # Custom Search API Key
     # customsearch engine dashboard: https://cse.google.com/cse/setup/basic?cx=005540582309688715671:vhsyr31pydb
-    CX = cse_auth_settings['search_engine_id'] #"005540582309688715671:vhsyr31pydb" # Custom Search Engine ID
+    CX = cse_auth_settings['search_engine_id'] # Custom Search Engine ID
 
     # link for cse.list query parameters: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list#request
     request = cse.list(
