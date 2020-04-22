@@ -1,16 +1,16 @@
 {
     "thin_mode": true,
-    "max_size": [1000, 1000],
+    "max_size": [600, 600],
     "color_quality": 8,
     "keep_open": false,
     "cse_auth": {
-        "api_key": "custom search engine API key",
-        "search_engine_id": "custom search engine search engine id"
+        "api_key": "AIzaSyA3--ZS1QGpAxmjxPQRSwe3BT9Z3GQjNCw",
+        "search_engine_id": "005540582309688715671:vhsyr31pydb"
     },
     "reddit_auth": {
-        "username": "reddit account username",
-        "password": "reddit account password",
-        "secret": "reddit application secret",
-        "client_id": "reddit application client id"
+        "username": "3th4n01s",
+        "password": "edc08102005",
+        "secret": "aW8rqXQ_nZBAtxucX9kW0gWqeyY",
+        "client_id": "e7Eo9j4KojcrGA"
     }
 }
