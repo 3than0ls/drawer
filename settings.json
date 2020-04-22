@@ -1,0 +1,16 @@
+{
+    "thin_mode": true,
+    "max_size": [600, 600],
+    "color_quality": 8,
+    "keep_open": false,
+    "cse_auth": {
+        "api_key": "",
+        "search_engine_id": ""
+    },
+    "reddit_auth": {
+        "username": "",
+        "password": "",
+        "secret": "",
+        "client_id": ""
+    }
+}
