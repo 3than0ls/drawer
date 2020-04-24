@@ -6,7 +6,6 @@ from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 import os
 
-
 def save_images(image_urls):
     headers = {
         'user-agent': 'drawer script'
@@ -117,5 +116,5 @@ def download_from_reddit(limit=5, random=False):
 
 
 if __name__ == '__main__':
-    # download_from_cse()
-    download_from_reddit()
+    download_from_cse()
+    # download_from_reddit()

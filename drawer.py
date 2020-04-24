@@ -1,6 +1,7 @@
 import os
 import subprocess
 import threading
+import shutil
 import time
 import pyautogui
 import keyboard
@@ -16,12 +17,15 @@ screen_width, screen_height = pyautogui.size()
 canvas_box, canvas_x, canvas_y = [None] * 3
 running = True
 
+# error when converting jpg to png, likely because of the time it takes to convert draw_directions has already started and missed
+
 # assign settings
 with open("settings.json", "r") as settings_file:
     settings = json.load(settings_file)
     thin_mode = settings["thin_mode"]
     max_size = settings["max_size"]
     color_quality = settings["color_quality"]
+    save_temp = settings["save_temp"]
     keep_open = settings["keep_open"]
 
 
@@ -46,7 +50,7 @@ def drag_draw():
     # first, locate the canvas of the paint application window
     canvas_center = pyautogui.locateCenterOnScreen(
         'images/canvas.png', region=(0, 0, screen_width, screen_height))
-    if (canvas_center):
+    if canvas_center:
         # begin drawing
         pyautogui.moveTo(canvas_center[0], canvas_center[1], 1)
         directions = (
@@ -158,11 +162,11 @@ def full_directions(image_basename):
     }
 
 
-def resize_image(image_basename):
+def modify_image(image_basename):
     global max_size
     with Image.open(os.path.join('input', image_basename)) as im:
         # limit the size of these images so they don't take too long to complete
-        if im.size[0] > max_size[0] or im.size[1] > max_size[0]: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
+        if im.size[0] > max_size[0] or im.size[1] > max_size[1]: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
             im.thumbnail(max_size, Image.ANTIALIAS)
         image_name = os.path.splitext(image_basename)[0]
         im.save(os.path.join('temp', '{}.png'.format(image_name)))
@@ -243,6 +247,7 @@ def setup(directions):
     th.start()
     # wait for paint application to start
     time.sleep(0.5)
+    pyautogui.moveTo(screen_width-50, 50)
     draw(directions, color_locations)
     pyautogui.moveTo(screen_width-50, 50)
     th.join()
@@ -257,15 +262,18 @@ def main():
 
         image_basenames = [os.path.basename(input_image) for input_image in os.listdir('input')]
         
+
         with multiprocessing.Pool() as pool:
-            print('resizing images...')
-            pool.map(resize_image, image_basenames)
+            print('modifying images...')
+            pool.map(modify_image, image_basenames)
+            time.sleep(1)
             print('calculating drawing directions...')
             all_directions = pool.map(full_directions, image_basenames)
 
         for directions in all_directions:
             # print_results(directions)
-            setup(directions)
+            if running:
+                setup(directions)
             if not keep_open:
                 subprocess.call(['taskkill', '/f', '/im', 'mspaint.exe'])
 
@@ -280,7 +288,10 @@ def main():
         # clear everything in temp
         basenames = [os.path.basename(input_image) for input_image in os.listdir('temp/')]
         for basename in basenames:
+            if save_temp:
+                shutil.move(os.path.join('temp', basename), os.path.join('output', basename))
             os.remove(os.path.join('temp', basename))
+
 
 
 

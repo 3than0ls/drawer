@@ -1,16 +1,38 @@
 {
     "thin_mode": true,
-    "max_size": [600, 600],
+    "max_size": [
+        1500,
+        1500
+    ],
     "color_quality": 8,
+    "save_temp": true,
     "keep_open": false,
+    "locations": {
+        "thickness_button": [
+            636,
+            83
+        ],
+        "color_1_button": [
+            689,
+            84
+        ],
+        "edit_color_prompt": [
+            1093,
+            558
+        ],
+        "resize_button": [
+            182,
+            84
+        ]
+    },
     "cse_auth": {
-        "api_key": "",
-        "search_engine_id": ""
+        "api_key": null,
+        "search_engine_id": null
     },
     "reddit_auth": {
-        "username": "",
-        "password": "",
-        "secret": "",
-        "client_id": ""
+        "username": null,
+        "password": null,
+        "secret": null,
+        "client_id": null
     }
 }

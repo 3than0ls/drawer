@@ -3,6 +3,8 @@ import pyautogui
 import time
 from math import sqrt
 import os
+import json
+from settings_manager import calibrate
 
 screen_width, screen_height = pyautogui.size()
 
@@ -70,7 +72,7 @@ def expand_colors(image_basename, num=2):
                     abs(color_data[1][1] - rgb[1])**2 + 
                     abs(color_data[1][2] - rgb[2])**2
                 )
-                if color_diff <= 12/num:
+                if color_diff <= min((4, 12/(num)/2)):
                     # print('{} already exists as {}, with a color difference of {}'.format(color_data[1], rgb, color_diff))
                     break
             else:
@@ -92,15 +94,32 @@ def bucket_color(canvas_x, canvas_y):
     # Location of bucket button: Box(left=254, top=57, width=27, height=28)
     # print(pyautogui.locateOnScreen('images/brushes.png'))
     # Location of brushes button: Box(left=309, top=49, width=51, height=69)
+    # locations should be universal
 
     pyautogui.click(264, 67)
     pyautogui.click(canvas_x+3, canvas_y+3)
     pyautogui.click(320, 60, 3)
 
-def add_colors(new_colors, _color_1_button_location=[]):
-    if not _color_1_button_location:
-        _color_1_button_location.append(pyautogui.locateCenterOnScreen('images/color_1.png'))
-    color_1_button_location = _color_1_button_location[0]
+def add_colors(new_colors, _color_1_button_location=[], _edit_color_prompt_location = []):
+    if not _color_1_button_location or not _edit_color_prompt_location: # if locations are not memoized
+        with open('settings.json', 'r') as settings: 
+            locations = json.load(settings)['locations']
+            if 'color_1_button' in locations: # open settings and see if location is in there
+                color_1_button_location = locations['color_1_button']
+            else: # if not locate it and update settings
+                color_1_button_location = pyautogui.locateCenterOnScreen('images/color_1.png')
+                calibrate('color_1_button', color_1_button_location)
+
+            if 'edit_color_prompt' in locations: # open settings and see if location is in there
+                edit_color_prompt_location = locations['edit_color_prompt']
+            else: # if not, set value to None and later the value will be found in the correct environmental conditions
+                edit_color_prompt_location = None
+    else: # if locations are memoized and cached in function, use that
+        if _color_1_button_location:
+            color_1_button_location = _color_1_button_location[0]
+        if _edit_color_prompt_location:
+            edit_color_prompt_location = _edit_color_prompt_location[0]
+    
     color_2_button_location = (color_1_button_location[0] + 40, color_1_button_location[1])
     edit_colors_button_location = (color_1_button_location[0] + 300, color_1_button_location[1])
 
@@ -109,12 +128,30 @@ def add_colors(new_colors, _color_1_button_location=[]):
     pyautogui.PAUSE = 0.005
 
     new_locations = {}
-
     current_box = 0
-    for color, rgb in new_colors.items():
+    for color, rgb in new_colors.items():   
         # click edit colors button
         pyautogui.click(edit_colors_button_location[0], edit_colors_button_location[1])
         time.sleep(0.1)
+
+        if edit_color_prompt_location is None:
+            time.sleep(0.2)
+            edit_color_prompt_location = pyautogui.locateCenterOnScreen('images/edit_colors.png')
+            calibrate('edit_color_prompt', edit_color_prompt_location)
+            _edit_color_prompt_location.append(edit_color_prompt_location)
+
+        # double click Red input box
+        pyautogui.doubleClick(382 + edit_color_prompt_location[0], 221 + edit_color_prompt_location[1])
+        pyautogui.write(str(rgb[0]))
+        # doube click Green input box
+        pyautogui.doubleClick(382 + edit_color_prompt_location[0], 236 + edit_color_prompt_location[1])
+        pyautogui.write(str(rgb[1]))
+        # double click Blue input box
+        pyautogui.doubleClick(382 + edit_color_prompt_location[0], 255 + edit_color_prompt_location[1])
+        pyautogui.write(str(rgb[2]))
+        # move to okay button
+        pyautogui.click(7 + edit_color_prompt_location[0], 286 + edit_color_prompt_location[1])
+        """
         # double click Red input box
         pyautogui.doubleClick(1475, 770)
         pyautogui.write(str(rgb[0]))
@@ -125,7 +162,7 @@ def add_colors(new_colors, _color_1_button_location=[]):
         pyautogui.doubleClick(1475, 820)
         pyautogui.write(str(rgb[2]))
         # move to okay button
-        pyautogui.click(1100, 845)
+        pyautogui.click(1100, 845)"""
 
         # add locations onto current locations
         # location of first custom color box is (760, 103). From then on, the gap between boxes is 22 pixels, and we only need to go right
@@ -139,12 +176,23 @@ def add_colors(new_colors, _color_1_button_location=[]):
     
     pyautogui.moveTo(screen_width-50, 50)
 
+    # memoize values if needed
+    if not _color_1_button_location:
+        _color_1_button_location.append(color_1_button_location)
+    if not _edit_color_prompt_location:
+        _edit_color_prompt_location.append(edit_color_prompt_location)
+
     return new_locations
 
 
 def set_thickness():
-    # something seems to be wrong with the thinnest thickness
-    thickness_button = pyautogui.locateCenterOnScreen('images/thickness.png', region=(0, 0, screen_width, screen_height))
+    with open('settings.json', 'r') as settings: 
+        locations = json.load(settings)['locations']
+        if 'thickness_button' in locations: # open settings and see if location is in there
+            thickness_button = locations['thickness_button']
+        else: # if not locate it and update settings
+            thickness_button = pyautogui.locateCenterOnScreen('images/thickness.png')
+            calibrate('thickness_button', thickness_button)
     pyautogui.click(thickness_button[0], thickness_button[1])
     time.sleep(0.45)
     pyautogui.click(thickness_button[0], thickness_button[1]+55)
@@ -152,7 +200,14 @@ def set_thickness():
 
 
 def set_size(size):
-    resize_button_location = pyautogui.locateCenterOnScreen('images/resize.png')
+    with open('settings.json', 'r') as settings: 
+        locations = json.load(settings)['locations']
+        if 'resize_button' in locations: # open settings and see if location is in there
+            resize_button_location = locations['resize_button']
+        else: # if not locate it and update settings
+            resize_button_location = pyautogui.locateCenterOnScreen('images/resize.png')
+            calibrate('resize_button', resize_button_location)
+            
     pyautogui.click(resize_button_location)
     # location of pixel resize button
     pyautogui.click(215, 155)
@@ -167,6 +222,8 @@ def set_size(size):
 
     # location of OK button
     pyautogui.click(140, 450)
+
+
 
 def locate_color(rgb_value):
     with Image.open('images/toolbar.png') as toolbar:
