@@ -168,8 +168,8 @@ def modify_image(image_basename):
         # limit the size of these images so they don't take too long to complete
         if im.size[0] > max_size[0] or im.size[1] > max_size[1]: # maybe base these constant values off of pyautogui.screenWidth and screenHeight?
             im.thumbnail(max_size, Image.ANTIALIAS)
-        image_name = os.path.splitext(image_basename)[0]
-        im.save(os.path.join('temp', '{}.png'.format(image_name)))
+        # image_name = os.path.splitext(image_basename)[0]
+        im.save(os.path.join('temp', '{}'.format(image_basename)))
 
 def combined_map_draw(directions, color_locations):
     global canvas_x, canvas_y
@@ -270,6 +270,9 @@ def main():
             print('calculating drawing directions...')
             all_directions = pool.map(full_directions, image_basenames)
 
+        # print('Starting in 5 seconds...')
+        # time.sleep(5)
+
         for directions in all_directions:
             # print_results(directions)
             if running:
@@ -288,9 +291,10 @@ def main():
         # clear everything in temp
         basenames = [os.path.basename(input_image) for input_image in os.listdir('temp/')]
         for basename in basenames:
-            if save_temp:
+            if save_temp and running:
                 shutil.move(os.path.join('temp', basename), os.path.join('output', basename))
-            os.remove(os.path.join('temp', basename))
+            else:
+                os.remove(os.path.join('temp', basename))
 
 
 

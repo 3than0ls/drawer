@@ -1,14 +1,19 @@
 import json
 
 
-def update_settings(value_type, new_value):
-    """update the specified value_type in settings.json with new_value"""
+
+def get_settings():
     with open('settings.json', 'r') as settings:
         data = json.load(settings)
-        new_values = {
-            value_type: new_value
-        }
-        data.update(new_values)
+    return data
+
+def update_settings(value_type, new_value):
+    """update the specified value_type in settings.json with new_value"""
+    data = get_settings()
+    new_values = {
+        value_type: new_value
+    }
+    data.update(new_values)
 
 
     with open('settings.json', 'w') as settings:
@@ -16,13 +21,12 @@ def update_settings(value_type, new_value):
 
 def calibrate(value_type, new_value):
     """update the specified value_type of the locations object in settings.json with new_value. Values should be location values (coordinates) for UI parts"""
-    with open('settings.json', 'r') as settings:
-        data = json.load(settings)
-        locations_temp = data['locations']
-        new_location = {
-            value_type: new_value
-        }
-        locations_temp.update(new_location)
+    data = get_settings()
+    locations_temp = data['locations']
+    new_location = {
+        value_type: new_value
+    }
+    locations_temp.update(new_location)
 
 
     with open('settings.json', 'w') as settings:

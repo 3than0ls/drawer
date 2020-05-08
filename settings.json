@@ -1,12 +1,12 @@
 {
     "thin_mode": true,
     "max_size": [
-        1500,
-        1500
+        550,
+        550
     ],
     "color_quality": 8,
-    "save_temp": true,
-    "keep_open": false,
+    "save_temp": false,
+    "keep_open": true,
     "locations": {
         "thickness_button": [
             636,
