@@ -1,12 +1,12 @@
 {
-    "thin_mode": true,
+    "thickness": 1,
     "max_size": [
-        550,
-        550
+        400,
+        400
     ],
-    "color_quality": 8,
+    "color_quality": 2,
     "save_temp": false,
-    "keep_open": true,
+    "keep_open": false,
     "locations": {
         "thickness_button": [
             636,
@@ -26,13 +26,13 @@
         ]
     },
     "cse_auth": {
-        "api_key": null,
-        "search_engine_id": null
+        "api_key": "api key",
+        "search_engine_id": "search engine id"
     },
     "reddit_auth": {
-        "username": null,
-        "password": null,
-        "secret": null,
-        "client_id": null
+        "username": "username",
+        "password": "password",
+        "secret": "secret",
+        "client_id": "client id"
     }
 }
